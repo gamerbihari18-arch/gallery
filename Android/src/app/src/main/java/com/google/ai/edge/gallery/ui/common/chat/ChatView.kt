@@ -122,12 +122,19 @@ fun ChatView(
   onBenchmarkClicked: (Model, ChatMessage, Int, Int) -> Unit,
   navigateUp: () -> Unit,
   modifier: Modifier = Modifier,
-  onResetSessionClicked: (Model, List<ChatMessage>, () -> Unit) -> Unit = { _, _, onDone ->
-    onDone()
-  },
+  skillCount: Int = 0,
+  mcpCount: Int = 0,
+  onResetSessionClicked:
+    (
+      model: Model, initialMessages: List<ChatMessage>, clearHistory: Boolean, onDone: () -> Unit,
+    ) -> Unit =
+    { _, _, _, onDone ->
+      onDone()
+    },
   onStreamImageMessage: (Model, ChatMessageImage) -> Unit = { _, _ -> },
   onStopButtonClicked: (Model) -> Unit = {},
   onSkillClicked: () -> Unit = {},
+  onMcpClicked: () -> Unit = {},
   showStopButtonInInputWhenInProgress: Boolean = false,
   composableBelowMessageList: @Composable (Model) -> Unit = {},
   showImagePicker: Boolean = false,
@@ -240,10 +247,11 @@ fun ChatView(
                     viewModel.setIsResettingSession(true)
                     val messages =
                       withContext(Dispatchers.IO) { deserializeProtoMessages(session.messagesList) }
-                    onResetSessionClicked(selectedModel, messages) {
-                      for (msg in messages) {
-                        viewModel.addMessage(selectedModel, msg)
-                      }
+                    viewModel.clearAllMessages(selectedModel)
+                    for (msg in messages) {
+                      viewModel.addMessage(selectedModel, msg)
+                    }
+                    onResetSessionClicked(selectedModel, messages, /* clearHistory= */ false) {
                       viewModel.setIsResettingSession(false)
                     }
                     viewModel.currentSessionId = session.sessionId
@@ -254,13 +262,13 @@ fun ChatView(
               onHistoryItemDeleted = { sessionId ->
                 viewModel.deleteSession(sessionId, context)
                 if (sessionId == viewModel.currentSessionId) {
-                  onResetSessionClicked(selectedModel, emptyList()) {}
+                  onResetSessionClicked(selectedModel, emptyList(), /* clearHistory= */ true) {}
                   viewModel.currentSessionId = UUID.randomUUID().toString()
                 }
               },
               onHistoryItemsDeleteAll = {
                 viewModel.clearAllSessions(context)
-                onResetSessionClicked(selectedModel, emptyList()) {}
+                onResetSessionClicked(selectedModel, emptyList(), /* clearHistory= */ true) {}
                 viewModel.currentSessionId = UUID.randomUUID().toString()
                 scope.launch { drawerState.close() }
               },
@@ -279,7 +287,7 @@ fun ChatView(
                   },
                 )
 
-                onResetSessionClicked(selectedModel, emptyList()) {}
+                onResetSessionClicked(selectedModel, emptyList(), /* clearHistory= */ true) {}
                 viewModel.currentSessionId = UUID.randomUUID().toString()
                 scope.launch { drawerState.close() }
               },
@@ -371,6 +379,8 @@ fun ChatView(
                       selectedModel = selectedModel,
                       viewModel = viewModel,
                       innerPadding = innerPadding,
+                      skillCount = skillCount,
+                      mcpCount = mcpCount,
                       navigateUp = navigateUp,
                       onSendMessage = { model, messages -> onSendMessage(model, messages) },
                       onRunAgainClicked = onRunAgainClicked,
@@ -392,6 +402,7 @@ fun ChatView(
                         showImageViewer = true
                       },
                       onSkillClicked = onSkillClicked,
+                      onMcpClicked = onMcpClicked,
                       modifier = Modifier.weight(1f),
                       showStopButtonInInputWhenInProgress = showStopButtonInInputWhenInProgress,
                       showImagePicker = showImagePicker,

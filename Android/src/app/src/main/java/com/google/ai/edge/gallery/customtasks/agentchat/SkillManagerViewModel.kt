@@ -24,6 +24,7 @@ import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.LocalLibrary
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Notifications
@@ -41,7 +42,6 @@ import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.data.SkillAllowlist
 import com.google.ai.edge.gallery.firebaseAnalytics
 import com.google.ai.edge.gallery.proto.Skill
-import com.google.ai.edge.litertlm.Contents
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -74,6 +74,12 @@ val TRYOUT_CHIPS: List<SkillTryOutChip> =
       label = "Schedule Reminder",
       prompt = "Set a daily reminder at 9am to check my schedule for today.",
       skillName = "schedule-notification",
+    ),
+    SkillTryOutChip(
+      icon = Icons.Outlined.Lightbulb,
+      label = "Learn something new",
+      prompt = "I want to learn something new!",
+      skillName = "learn-something-new",
     ),
     SkillTryOutChip(
       icon = Icons.Outlined.SentimentVerySatisfied,
@@ -143,10 +149,10 @@ constructor(
     }
   }
 
-  fun loadSkills(onDone: () -> Unit) {
+  suspend fun loadSkills() {
     if (!skillLoaded) {
       setLoading(true)
-      viewModelScope.launch(Dispatchers.IO) {
+      withContext(Dispatchers.IO) {
         Log.d(TAG, "Loading skills index...")
 
         // 1. Load all skills from DataStore.
@@ -236,10 +242,7 @@ constructor(
 
         setLoading(false)
         skillLoaded = true
-        withContext(Dispatchers.Default) { onDone() }
       }
-    } else {
-      onDone()
     }
   }
 
@@ -728,25 +731,6 @@ constructor(
 
   fun getSelectedSkills(): List<Skill> {
     return _uiState.value.skills.filter { it.skill.selected }.map { it.skill }
-  }
-
-  fun injectSkills(baseSystemPrompt: String): Contents {
-    // Replace ___SKILLS___ with the following skills list:
-    //
-    // - skill_name_1: skill_description_1
-    // - skill_name_2: skill_description_2
-    // - skill_name_3: skill_description_3
-    val selectedSkillsNamesAndDescriptions = getSelectedSkillsNamesAndDescriptions()
-    val systemPrompt =
-      if (selectedSkillsNamesAndDescriptions.isBlank()) {
-        // If no skills are selected, silently discard the system prompt entirely.
-        // TODO: b/509944016 - Improve this fallback behavior.
-        ""
-      } else {
-        baseSystemPrompt.replace("___SKILLS___", selectedSkillsNamesAndDescriptions)
-      }
-    Log.d(TAG, "System prompt:\n$systemPrompt")
-    return Contents.of(systemPrompt)
   }
 
   fun getSkill(name: String): Skill? {
